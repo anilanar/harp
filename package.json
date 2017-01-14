@@ -7,13 +7,18 @@
   "author": "Anil Anar <anilanar@hotmail.com>",
   "license": "MIT",
   "dependencies": {
-    "babel-cli": "^6.18.0",
     "babel-core": "^6.21.0",
-    "babel-loader": "^6.2.10",
-    "babel-preset-env": "^1.1.6",
+    "dedent-js": "^1.0.1",
     "incremental-dom": "^0.5.1",
     "redux": "^3.6.0",
-    "shallowequal": "^0.2.2",
+    "shallowequal": "^0.2.2"
+  },
+  "devDependencies": {
+    "@types/incremental-dom": "^0.5.0",
+    "@types/node": "^6.0.59",
+    "babel-cli": "^6.18.0",
+    "babel-loader": "^6.2.10",
+    "babel-preset-env": "^1.1.8",
     "webpack": "beta"
   }
 }
