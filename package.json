@@ -6,8 +6,10 @@
   "repository": "https://github.com/anilanar/harp",
   "author": "Anil Anar <anilanar@hotmail.com>",
   "license": "MIT",
+  "scripts": {
+    "test": "jest"
+  },
   "dependencies": {
-    "babel-core": "^6.21.0",
     "dedent-js": "^1.0.1",
     "incremental-dom": "^0.5.1",
     "redux": "^3.6.0",
@@ -17,8 +19,23 @@
     "@types/incremental-dom": "^0.5.0",
     "@types/node": "^6.0.59",
     "babel-cli": "^6.18.0",
+    "babel-core": "^6.21.0",
     "babel-loader": "^6.2.10",
     "babel-preset-env": "^1.1.8",
+    "jest": "^18.1.0",
+    "lodash": "^4.17.4",
+    "typescript": "^2.1.5",
     "webpack": "beta"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": "<rootDir>/tools/jest-typescript.js"
+    },
+    "testRegex": "/__tests__/.+\\.spec\\.ts$"
   }
 }
