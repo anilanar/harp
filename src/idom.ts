@@ -1,16 +1,6 @@
-import * as idom from 'incremental-dom';
 import {
-    ICache,
-    Children,
-    Template,
-    Fragment,
-    IOptions,
-} from './types';
-
-import {
-    getFragment,
-} from './fragment';
-
+    patchOuter,
+} from 'incremental-dom';
 
 export {
     elementOpen,
@@ -20,3 +10,25 @@ export {
     patchOuter,
 } from 'incremental-dom';
 
+import {
+    Template,
+} from './types';
+
+import {
+    createFragment,
+} from './fragment';
+
+import options from './options';
+
+export function render(template: Template, parentDom: Element): void {
+    const rootFragment = createFragment(
+        options,
+        null,
+        template,
+        null,
+        null,
+    );
+    patchOuter(parentDom, function () {
+        template(rootFragment, null, null);
+    });
+}

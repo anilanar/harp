@@ -1,30 +1,46 @@
 import {
     patchOuter,
-} from './idom';
+} from 'incremental-dom';
 
 import {
     Children,
-    Template,
     Fragment,
+    IBucket,
     IOptions,
+    IProps,
+    Template,
 } from './types';
 
-import * as fragmentCacher from './default-fragment-cacher';
+import options from './options';
 
 import * as dedent from 'dedent-js';
 
-const options: IOptions = {
-    fragmentCacher,
-};
-
-function createFragment<ParentProps, Props>(
+/**
+ * Creates a fragment or retrieves it from the cache. Cache strategy can be no-op,
+ * never caching fragments. In that case, fragments would always be created.
+ * Thus performance of this function heavily depends on the cache strategy.
+ */
+export function createFragment(
     options: IOptions,
-    parentFragment: Fragment,
+    parentFragment: Fragment|null,
     template: Template,
-    key: string,
+    key: string|null,
     children: Children|null,
 ): Fragment {
-    return {
+    const {fragmentCacher: cacher} = options;
+    if (parentFragment != null) {
+        const childFragment = cacher.getChild(
+            parentFragment.cache,
+            key,
+        );
+        if (childFragment != null && childFragment.template === template) {
+            cacher.mark(parentFragment.cache, key);
+            childFragment.children = children;
+            return childFragment;
+        }
+    }
+
+    const newFragment = {
         key,
         parent: parentFragment,
         element: null,
@@ -33,41 +49,17 @@ function createFragment<ParentProps, Props>(
         children,
         onRemoved: null,
     };
-}
 
-/**
- * Creates a fragment or retrieves it from the cache. Cache strategy can be no-op,
- * never caching fragments. In that case, fragments would always be created.
- * Thus performance of this function heavily depends on the cache strategy.
- */
-export function getFragment<ParentProps, Props>(
-    options: IOptions,
-    parentFragment: Fragment,
-    template: Template,
-    key: string,
-    children: Children|null,
-): Fragment {
-    const {fragmentCacher: cacher} = options;
-    const childFragment = cacher.getChild(
-        parentFragment.cache,
-        key,
-    );
-    if (childFragment != null && childFragment.template === template) {
-        cacher.mark(parentFragment.cache, key);
-        childFragment.children = children;
-        return childFragment;
+    if (parentFragment != null) {
+        cacher.putChild(
+            parentFragment.cache,
+            newFragment,
+        );
     }
-    const newFragment = createFragment(
-        options,
-        parentFragment,
-        template,
-        key,
-        children,
-    );
     return newFragment;
 }
 
-export function refresh<Props>(
+export function refresh(
     fragment: Fragment,
 ): void {
     if (fragment.element == null) {
@@ -83,12 +75,13 @@ export function refresh<Props>(
             fragment.template,
             fragment.key,
             fragment.children,
+            null
         );
     });
 }
 
 
-export function remove<Props>(
+export function remove(
     fragment: Fragment,
 ): boolean {
     if (fragment.onRemoved == null) {
@@ -98,29 +91,27 @@ export function remove<Props>(
     return true;
 }
 
-export function fragmentVoid<Props>(
-    parentFragment: Fragment,
+export function fragmentVoid(
+    parentFragment: Fragment|null,
     template: Template,
-    key: string,
+    key: string|null,
     children: Children|null,
-    statics?: Array<string>,
-    props?: Props,
-): HTMLElement|null {
-    const fragment = getFragment(
+    props: IProps|null,
+): Element {
+    const fragment = createFragment(
         options,
         parentFragment,
         template,
         key,
         children
     );
-    //node.renderInfo.renderedKeys.clear();
-
-    //if (node.renderInfo.shouldRender === false) {
-    //    return null;
-    //}
-
-    if (statics != null && props != null) {
-        template(fragment, statics, props, children);
-    }
-    return null;
+    fragment.element = template(fragment, props, children);
+    return fragment.element;
 };
+
+export function getBucket(fragment: Fragment): IBucket {
+    if (fragment.bucket == null) {
+        fragment.bucket = {};
+    }
+    return fragment.bucket;
+}

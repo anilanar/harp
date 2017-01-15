@@ -1,33 +1,33 @@
 export type Children = () => void;
 export type OnRemoved = () => void;
+export type OnRemoveFromCache = (fragment: Fragment) => void;
 
-interface Props {}
-interface Statics {}
+export interface IProps {}
 
 export type Fragment = {
-    key: string,
-    parent: Fragment,
-    element: Element|null,
+    bucket?: IBucket,
     cache: ICache,
-    template: Template,
     children: Children|null,
+    element: Element|null,
+    key: string|null,
     onRemoved: OnRemoved|null,
+    parent: Fragment|null,
+    template: Template,
 };
 
 export type Template = (
     parentFragment: Fragment,
-    statics: Statics,
-    props: Props,
+    props: IProps|null,
     children: Children|null,
 ) => Element;
 
 
 export interface IFragmentCacher {
     createCache(): ICache;
-    getChild(cache: ICache, key: string): Fragment|null;
-    putChild(cache: ICache, child: Fragment): void;
-    mark(cache: ICache, key: string): void;
-    clean(cache: ICache): void;
+    getChild(cache: ICache, key: string|null): Fragment|null;
+    putChild(cache: ICache, child: Fragment): string|null;
+    mark(cache: ICache, key: string|null): void;
+    clean(cache: ICache, onRemove: OnRemoveFromCache): void;
 }
 
 export interface IOptions {
@@ -35,4 +35,7 @@ export interface IOptions {
 }
 
 export interface ICache {
+}
+
+export interface IBucket {
 }

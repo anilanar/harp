@@ -8,7 +8,7 @@
         "strictNullChecks": true,
         "noImplicitReturns": true,
         "noImplicitThis": true,
-        "noUnusedLocals": false,
+        "noUnusedLocals": true,
         "removeComments": false
     },
     "files": [
