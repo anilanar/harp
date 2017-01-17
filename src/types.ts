@@ -5,15 +5,15 @@ export type OnRemoveFromCache = (fragment: IFragment) => void;
 export interface IProps {}
 
 export interface IBaseFragment {
-    parent: IFragment|undefined,
     isEmpty: boolean,
     onRemoved: OnRemoved|undefined,
+    parent: IFragment|undefined,
 };
 
 export type EmptyFragment = {
-    parent: IFragment,
     isEmpty: true,
     onRemoved: OnRemoved|undefined,
+    parent: IFragment|undefined,
 };
 
 export interface IFragment extends IBaseFragment {

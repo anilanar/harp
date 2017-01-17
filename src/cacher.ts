@@ -73,9 +73,24 @@ export function putChild(
     child: IBaseFragment,
     suggestKeys = false,
 ): string|undefined {
+    // this case might be a common error, so just throw an error
+    const isValid = typeof child === 'object'
+        && (
+            child.isEmpty === true
+            || child.isEmpty === false
+        );
+    if (!isValid) {
+        throwError(dedent`
+            "putChild" takes a fragment. Provided value:
+            ${child}
+        `);
+    }
+
     const isUnkeyed = suggestKeys === false
-        || child.isEmpty
-        || (child as IFragment).key === undefined;
+        && (
+            child.isEmpty
+            || (child as IFragment).key === undefined
+        );
 
     if (isUnkeyed) {
         if (cache.unkeyed === undefined) {
@@ -85,6 +100,8 @@ export function putChild(
         return undefined;
     }
 
+    // At this point suggestKeys is true
+    // or fragment is keyed
     const keyedChild = <IFragment>child;
 
     const key = keyedChild.key !== undefined

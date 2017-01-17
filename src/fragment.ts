@@ -4,6 +4,7 @@ import {
 
 import {
     Children,
+    EmptyFragment,
     IBaseFragment,
     IFragment,
     IBucket,
@@ -71,7 +72,7 @@ export function createFragment(
     return realFragment;
 }
 
-function createNewFragment(
+export function createNewFragment(
     options: IOptions,
     parentFragment: IFragment|undefined,
     template: Template,
@@ -98,6 +99,16 @@ function createNewFragment(
         cacher.mark(parentFragment.cache, key);
     }
     return newFragment;
+}
+
+export function createEmptyFragment(
+    parentFragment: IFragment|undefined,
+): EmptyFragment {
+    return {
+        isEmpty: true,
+        parent: parentFragment,
+        onRemoved: undefined,
+    };
 }
 
 export function refresh(
