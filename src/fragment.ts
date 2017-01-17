@@ -4,7 +4,8 @@ import {
 
 import {
     Children,
-    Fragment,
+    IBaseFragment,
+    IFragment,
     IBucket,
     IOptions,
     IProps,
@@ -22,47 +23,87 @@ import * as dedent from 'dedent-js';
  */
 export function createFragment(
     options: IOptions,
-    parentFragment: Fragment|null,
+    parentFragment: IFragment|undefined,
     template: Template,
-    key: string|null,
-    children: Children|null,
-): Fragment {
-    const {fragmentCacher: cacher} = options;
-    if (parentFragment != null) {
-        const childFragment = cacher.getChild(
-            parentFragment.cache,
+    key: string|undefined,
+    children: Children|undefined,
+): IBaseFragment {
+    if (parentFragment === undefined) {
+        return createNewFragment(
+            options,
+            parentFragment,
+            template,
             key,
+            children
         );
-        if (childFragment != null && childFragment.template === template) {
-            cacher.mark(parentFragment.cache, key);
-            childFragment.children = children;
-            return childFragment;
-        }
     }
 
-    const newFragment = {
+    const {fragmentCacher: cacher} = options;
+    const childFragment = cacher.getChild(
+        parentFragment.cache,
+        key,
+    );
+    const shouldCreateNew = childFragment === undefined
+        || !childFragment.isEmpty
+        && (childFragment as IFragment).template !== template;
+
+    if (shouldCreateNew) {
+        return createNewFragment(
+            options,
+            parentFragment,
+            template,
+            key,
+            children
+        );
+    }
+
+    const definedFragment = childFragment as IBaseFragment;
+    if (definedFragment.isEmpty) {
+        cacher.mark(parentFragment.cache, undefined);
+        return definedFragment;
+    }
+
+    // from this point on, childFragment must be a non-empty fragment
+    const realFragment = childFragment as IFragment;
+
+    cacher.mark(parentFragment.cache, key);
+    realFragment.children = children;
+    return realFragment;
+}
+
+function createNewFragment(
+    options: IOptions,
+    parentFragment: IFragment|undefined,
+    template: Template,
+    key: string|undefined,
+    children: Children|undefined,
+): IFragment {
+    const cacher = options.fragmentCacher;
+    const newFragment: IFragment = {
         key,
         parent: parentFragment,
-        element: null,
-        cache: options.fragmentCacher.createCache(),
+        element: undefined,
+        cache: cacher.createCache(),
         template,
         children,
-        onRemoved: null,
+        onRemoved: undefined,
+        isEmpty: false,
     };
 
-    if (parentFragment != null) {
+    if (parentFragment !== undefined) {
         cacher.putChild(
             parentFragment.cache,
             newFragment,
         );
+        cacher.mark(parentFragment.cache, key);
     }
     return newFragment;
 }
 
 export function refresh(
-    fragment: Fragment,
+    fragment: IFragment,
 ): void {
-    if (fragment.element == null) {
+    if (fragment.element === undefined) {
         throw new Error(
             dedent`Cannot refresh the node due to it lacking its
             element. Either it's not mounted yet or it's already unmounted.`
@@ -75,16 +116,16 @@ export function refresh(
             fragment.template,
             fragment.key,
             fragment.children,
-            null
+            undefined
         );
     });
 }
 
 
 export function remove(
-    fragment: Fragment,
+    fragment: IFragment,
 ): boolean {
-    if (fragment.onRemoved == null) {
+    if (fragment.onRemoved === undefined) {
         return false;
     }
     fragment.onRemoved();
@@ -92,12 +133,12 @@ export function remove(
 }
 
 export function fragmentVoid(
-    parentFragment: Fragment|null,
+    parentFragment: IFragment|undefined,
     template: Template,
-    key: string|null,
-    children: Children|null,
-    props: IProps|null,
-): Element {
+    key: string|undefined,
+    children: Children|undefined,
+    props: IProps|undefined,
+): Element|undefined {
     const fragment = createFragment(
         options,
         parentFragment,
@@ -105,12 +146,17 @@ export function fragmentVoid(
         key,
         children
     );
-    fragment.element = template(fragment, props, children);
-    return fragment.element;
+    if (fragment.isEmpty) {
+        return undefined;
+    }
+
+    const realFragment = fragment as IFragment;
+    realFragment.element = template(realFragment, props, children);
+    return realFragment.element;
 };
 
-export function getBucket(fragment: Fragment): IBucket {
-    if (fragment.bucket == null) {
+export function getBucket(fragment: IFragment): IBucket {
+    if (fragment.bucket === undefined) {
         fragment.bucket = {};
     }
     return fragment.bucket;

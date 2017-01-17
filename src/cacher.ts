@@ -1,5 +1,6 @@
 import {
-    Fragment,
+    IBaseFragment,
+    IFragment,
     OnRemoveFromCache,
 } from './types';
 
@@ -10,71 +11,97 @@ import {
 import * as dedent from 'dedent-js';
 
 type Cache = {
-    keyed: {[key: string]: Fragment|null} | null,
-    unkeyed: Array<Fragment|null> | null,
-    renderedKeys: {[key: string]: 1|undefined} | null,
-    renderedIndices: Array<number> | null,
     getIndex: number,
+    keyed: {[key: string]: IFragment} | undefined,
+    keyedCount: number,
     markIndex: number,
-    removedKeyCount: number,
+    renderedIndices: Array<1|0> | undefined,
+    renderedKeys: {[key: string]: 1|undefined} | undefined,
+    suggestedCount: number,
+    // although we never put undefined into it,
+    // for type safety, we union value type with undefined
+    // for invalid keys
+    unkeyed: Array<IBaseFragment> | undefined,
 };
 
 export function createCache(): Cache {
     return {
-        keyed: null,
-        unkeyed: null,
-        renderedKeys: null,
-        renderedIndices: null,
         getIndex: 0,
+        keyed: undefined,
+        keyedCount: 0,
         markIndex: 0,
-        removedKeyCount: 0,
+        renderedIndices: undefined,
+        renderedKeys: undefined,
+        suggestedCount: 0,
+        unkeyed: undefined,
     };
 }
 
-export function getChild(cache: Cache, key: string|null): Fragment|null {
-    if (key == null) {
-        if (cache.unkeyed == null) {
-            return null;
+// how to tell between
+// 1) could not find
+// 2) empty fragment
+export function getChild(
+    cache: Cache,
+    key: string|undefined,
+): IBaseFragment|undefined {
+    if (key === undefined) {
+        if (cache.unkeyed === undefined) {
+            return undefined;
         }
         const child = cache.unkeyed[cache.getIndex];
-        cache.getIndex++;
+        cache.getIndex += 1;
         return child;
     }
-    if (cache.keyed == null) {
-        return null;
+    if (cache.keyed === undefined) {
+        return undefined;
     }
     return cache.keyed[key];
 }
 
 /**
  * Caches the fragment in the given cache object. If child fragment lacked a
- * key, cacher can optionally return a new key. Returns null if no key
+ * key, cacher can optionally return a new key. Returns undefined if no key
  * is required.
  *
- * For non-keyed fragments, putting null placeholders for fragments that are
+ * For non-keyed fragments, putting undefined placeholders for fragments that are
  * conditionally rendered allows finding the correct fragment for siblings,
- * thus fragment argument can also be null and that information should be
+ * thus fragment argument can also be undefined and that information should be
  * properly used by the cacher.
  */
-export function putChild(cache: Cache, child: Fragment|null): string|null {
-    if (child == null || child.key == null) {
-        if (cache.unkeyed == null) {
+export function putChild(
+    cache: Cache,
+    child: IBaseFragment,
+    suggestKeys = false,
+): string|undefined {
+    const isUnkeyed = suggestKeys === false
+        || child.isEmpty
+        || (child as IFragment).key === undefined;
+
+    if (isUnkeyed) {
+        if (cache.unkeyed === undefined) {
             cache.unkeyed = [];
         }
         cache.unkeyed.push(child);
-        return null;
+        return undefined;
     }
-    if (cache.keyed == null) {
-        cache.keyed = {};
-    }
-    cache.keyed[child.key] = child;
-    return null;
+
+    const keyedChild = <IFragment>child;
+
+    const key = keyedChild.key !== undefined
+        ? keyedChild.key
+        : `.f${cache.suggestedCount++}`;
+
+    cache.keyed = cache.keyed !== undefined
+        ? cache.keyed
+        : Object.create(null) as {};
+
+    cache.keyed[key] = keyedChild;
+    return key;
 }
 
-export function mark(cache: Cache, key: string|null): void {
-    if (key == null) {
-        console.log(cache.unkeyed && cache.unkeyed.length);
-        if (cache.unkeyed == null
+export function mark(cache: Cache, key: string|undefined): void {
+    if (key === undefined) {
+        if (cache.unkeyed === undefined
             || cache.unkeyed.length <= cache.markIndex
         ) {
             throwError(dedent`
@@ -84,55 +111,60 @@ export function mark(cache: Cache, key: string|null): void {
             `);
         }
 
-        if (cache.unkeyed[markIndex] == null) {
-            throwError(dedent`
-                There is no cached unkeyed fragment at the given index. Have
-                you forgotten to "mark" a previously created fragment?
-            `);
+        if (cache.renderedIndices === undefined) {
+            cache.renderedIndices = [];
         }
-
-        if (cache.renderedIndices == null) {
-            cache.renderedIndices = [cache.markIndex];
-        } else {
-            cache.renderedIndices.push(cache.markIndex);
+        for (let i = cache.renderedIndices.length; i < cache.markIndex; i++) {
+            // fill with undefined, we don't like sparse arrays
+            cache.renderedIndices.push(0);
         }
+        cache.renderedIndices.push(1);
         cache.markIndex += 1;
     }
     else {
-        if (cache.renderedKeys == null) {
-            cache.renderedKeys = {};
+        if (cache.renderedKeys === undefined) {
+            cache.renderedKeys = Object.create(null) as {};
         }
         cache.renderedKeys[key] = 1;
     }
 }
 
+export function skip(cache: Cache): void {
+    cache.markIndex++;
+}
+
 export function clean(
     cache: Cache,
-    onRemove: OnRemoveFromCache,
+    onRemove: OnRemoveFromCache|undefined,
 ): void {
     const {keyed, unkeyed, renderedKeys, renderedIndices} = cache;
 
-    if (keyed != null) {
+    if (keyed !== undefined) {
         // go through keyed children
         for (const key in keyed) {
             removeKeyed(cache, keyed, key, onRemove);
         }
     }
 
-    if (unkeyed != null) {
+    if (unkeyed !== undefined) {
         // go through unkeyed children
-        for (let idx = 0; idx < unkeyed.length; idx++) {
-            removeUnkeyed(cache, unkeyed, idx, onRemove);
+        // unkeyed array is modified during iteration thus
+        // we need to trace two indices, one is used for accessing unkeyed
+        // the other is used accessing rendered indices.
+        for (let index = 0, realIndex = 0; realIndex < unkeyed.length; index++) {
+            if(!removeUnkeyed(cache, unkeyed, index, realIndex, onRemove)) {
+                realIndex++;
+            }
         }
     }
 
     // reset renderedIndices, renderedKeys and unkeyedIndex
     // don't create additional garbage to collect for GC
-    if (renderedIndices != null) {
+    if (renderedIndices !== undefined) {
         renderedIndices.length = 0;
     }
-    if (renderedKeys != null) {
-        cache.renderedKeys = null;
+    if (renderedKeys !== undefined) {
+        cache.renderedKeys = undefined;
     }
     cache.getIndex = 0;
     cache.markIndex = 0;
@@ -140,43 +172,48 @@ export function clean(
 
 function removeKeyed(
     cache: Cache,
-    keyed: {[key: string]: Fragment|null},
+    keyed: {[key: string]: IFragment},
     key: string,
-    onRemove: OnRemoveFromCache,
+    onRemove: OnRemoveFromCache|undefined,
 ): void {
-    // children.keyed[key] can be null because deleting unmounted children
+    // children.keyed[key] can be undefined because deleting unmounted children
     // are defered to until that number hits a threshold.
     // in some js engines, delete operator deoptimizes objects thus
     // it is better to copy objects when there are enough keys to
     // delete
     const child = keyed[key];
-    if (child == null
-        || cache.renderedKeys != null
+    if (child === undefined
+        || cache.renderedKeys !== undefined
         && cache.renderedKeys[key] & 1
     ) {
         return;
     }
-    keyed[key] = null;
-    cache.removedKeyCount += 1;
-    onRemove(child);
+    delete keyed[key];
+    if (onRemove !== undefined) {
+        onRemove(child);
+    }
 }
 
 function removeUnkeyed(
     cache: Cache,
-    unkeyed: Array<Fragment|null>,
+    unkeyed: Array<IBaseFragment>,
     index: number,
-    onRemove: OnRemoveFromCache,
-) {
-    // children.unkeyed[idx] can be null because null can behave as
+    unkeyedIndex: number,
+    onRemove: OnRemoveFromCache|undefined,
+): boolean {
+    const child = unkeyed[unkeyedIndex];
+    const marked = cache.renderedIndices
+        && cache.renderedIndices[index];
+
+    if (marked & 1) {
+        return false;
+    }
+    unkeyed.splice(unkeyedIndex, 1);
+    // children.unkeyed[idx] can be undefined because undefined can behave as
     // placeholders for fragments that conditionally render.
     // that allows finding correct fragment for unkeyed fragments.
-    const child = unkeyed[index];
-    if (child == null
-        || cache.renderedIndices != null
-        && cache.renderedIndices[index]
-    ) {
-        return;
+    if (onRemove !== undefined && !child.isEmpty) {
+        onRemove(child as IFragment);
     }
-    unkeyed.splice(index, 1);
-    onRemove(child);
+    return true;
 }

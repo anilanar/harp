@@ -11,6 +11,7 @@ export {
 } from 'incremental-dom';
 
 import {
+    IFragment,
     Template,
 } from './types';
 
@@ -23,12 +24,12 @@ import options from './options';
 export function render(template: Template, parentDom: Element): void {
     const rootFragment = createFragment(
         options,
-        null,
+        undefined,
         template,
-        null,
-        null,
-    );
+        undefined,
+        undefined,
+    ) as IFragment;
     patchOuter(parentDom, function () {
-        template(rootFragment, null, null);
+        template(rootFragment, undefined, undefined);
     });
 }
