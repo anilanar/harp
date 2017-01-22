@@ -1,21 +1,26 @@
 import {
+    currentPointer,
     patchOuter,
+    skipNode,
 } from 'incremental-dom';
 
 import {
     Children,
-    EmptyFragment,
     IBaseFragment,
-    IFragment,
     IBucket,
+    ICache,
+    IEmptyFragment,
+    IFragment,
     IOptions,
     IProps,
+    ISubFragment,
+    OnRemoved,
     Template,
 } from './types';
 
 import options from './options';
 
-import * as dedent from 'dedent-js';
+import {dedent} from './shared';
 
 /**
  * Creates a fragment or retrieves it from the cache. Cache strategy can be no-op,
@@ -72,6 +77,36 @@ export function createFragment(
     return realFragment;
 }
 
+export class Fragment {
+    bucket?: IBucket;
+    cache: ICache;
+    children: Children|undefined;
+    element: Element|undefined;
+    isEmpty: false;
+    key: string|undefined;
+    onRemoved: OnRemoved|undefined;
+    parent: IFragment|undefined;
+    template: Template|undefined;
+
+    constructor(
+        cache: ICache,
+        children: Children|undefined,
+        isEmpty: boolean,
+        key: string|undefined,
+        parent: IFragment|undefined,
+        template: Template|undefined,
+    ) {
+        this.key = key;
+        this.parent = parent;
+        this.element = undefined;
+        this.cache = cache;
+        this.template = template;
+        this.children = children;
+        this.onRemoved = undefined;
+        this.isEmpty = false;
+    }
+}
+
 export function createNewFragment(
     options: IOptions,
     parentFragment: IFragment|undefined,
@@ -80,16 +115,14 @@ export function createNewFragment(
     children: Children|undefined,
 ): IFragment {
     const cacher = options.fragmentCacher;
-    const newFragment: IFragment = {
-        key,
-        parent: parentFragment,
-        element: undefined,
-        cache: cacher.createCache(),
-        template,
+    const newFragment = new Fragment(
+        new cacher.Cache(),
         children,
-        onRemoved: undefined,
-        isEmpty: false,
-    };
+        false,
+        key,
+        parentFragment,
+        template,
+    ) as IFragment;
 
     if (parentFragment !== undefined) {
         cacher.putChild(
@@ -103,16 +136,19 @@ export function createNewFragment(
 
 export function createEmptyFragment(
     parentFragment: IFragment|undefined,
-): EmptyFragment {
-    return {
-        isEmpty: true,
-        parent: parentFragment,
-        onRemoved: undefined,
-    };
+): IEmptyFragment {
+    return new Fragment(
+        new options.fragmentCacher.Cache(),
+        undefined,
+        true,
+        undefined,
+        parentFragment,
+        undefined,
+    ) as IEmptyFragment;
 }
 
 export function refresh(
-    fragment: IFragment,
+    fragment: ISubFragment,
 ): void {
     if (fragment.element === undefined) {
         throw new Error(
@@ -129,9 +165,17 @@ export function refresh(
             fragment.children,
             undefined
         );
+        options.fragmentCacher.reset(fragment.parent.cache);
     });
 }
 
+export function skip(fragment: IFragment): Element|undefined {
+    if (currentPointer() !== fragment.element) {
+        return undefined;
+    }
+    skipNode();
+    return fragment.element;
+}
 
 export function remove(
     fragment: IFragment,
@@ -163,6 +207,7 @@ export function fragmentVoid(
 
     const realFragment = fragment as IFragment;
     realFragment.element = template(realFragment, props, children);
+    options.fragmentCacher.clean(realFragment.cache, undefined);
     return realFragment.element;
 };
 

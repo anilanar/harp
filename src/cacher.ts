@@ -5,36 +5,36 @@ import {
 } from './types';
 
 import {
+    dedent,
     throwError,
 } from './shared';
 
-import * as dedent from 'dedent-js';
+type Keyed = {[key: string]: IFragment};
+type Unkeyed = Array<IBaseFragment>;
 
-type Cache = {
-    getIndex: number,
-    keyed: {[key: string]: IFragment} | undefined,
-    keyedCount: number,
-    markIndex: number,
-    renderedIndices: Array<1|0> | undefined,
-    renderedKeys: {[key: string]: 1|undefined} | undefined,
-    suggestedCount: number,
+export class Cache {
+    getIndex: number;
+    keyed: Keyed | undefined;
+    keyedCount: number;
+    markIndex: number;
+    renderedIndices: Array<1|0> | undefined;
+    renderedKeys: {[key: string]: 1|undefined} | undefined;
+    suggestedCount: number;
     // although we never put undefined into it,
     // for type safety, we union value type with undefined
     // for invalid keys
-    unkeyed: Array<IBaseFragment> | undefined,
-};
+    unkeyed: Unkeyed | undefined;
 
-export function createCache(): Cache {
-    return {
-        getIndex: 0,
-        keyed: undefined,
-        keyedCount: 0,
-        markIndex: 0,
-        renderedIndices: undefined,
-        renderedKeys: undefined,
-        suggestedCount: 0,
-        unkeyed: undefined,
-    };
+    constructor() {
+        this.getIndex = 0;
+        this.keyed = undefined;
+        this.keyedCount = 0;
+        this.markIndex = 0;
+        this.renderedIndices = undefined;
+        this.renderedKeys = undefined;
+        this.suggestedCount = 0;
+        this.unkeyed = undefined;
+    }
 }
 
 // how to tell between
@@ -45,10 +45,11 @@ export function getChild(
     key: string|undefined,
 ): IBaseFragment|undefined {
     if (key === undefined) {
-        if (cache.unkeyed === undefined) {
+        if (unkeyedCount(cache) <= cache.getIndex) {
+            cache.getIndex += 1;
             return undefined;
         }
-        const child = cache.unkeyed[cache.getIndex];
+        const child = (cache.unkeyed as Unkeyed)[cache.getIndex];
         cache.getIndex += 1;
         return child;
     }
@@ -113,14 +114,13 @@ export function putChild(
         : Object.create(null) as {};
 
     cache.keyed[key] = keyedChild;
+    cache.keyedCount++;
     return key;
 }
 
 export function mark(cache: Cache, key: string|undefined): void {
     if (key === undefined) {
-        if (cache.unkeyed === undefined
-            || cache.unkeyed.length <= cache.markIndex
-        ) {
+        if (unkeyedCount(cache) <= cache.markIndex) {
             throwError(dedent`
                 There is no cached unkeyed fragment left to mark. Make sure
                 that you use "putChild" to cache fragments before you "mark"
@@ -137,13 +137,20 @@ export function mark(cache: Cache, key: string|undefined): void {
         }
         cache.renderedIndices.push(1);
         cache.markIndex += 1;
+        return;
     }
-    else {
-        if (cache.renderedKeys === undefined) {
-            cache.renderedKeys = Object.create(null) as {};
-        }
-        cache.renderedKeys[key] = 1;
+
+    const isInvalid = keyedCount(cache) === 0
+        || (cache.keyed as Keyed)[key] === undefined;
+    if (isInvalid) {
+        throwError(dedent`
+            There is no fragment with key ${key} cached. Cannot mark it.
+        `);
     }
+    if (cache.renderedKeys === undefined) {
+        cache.renderedKeys = Object.create(null) as {};
+    }
+    cache.renderedKeys[key] = 1;
 }
 
 export function skip(cache: Cache): void {
@@ -154,12 +161,30 @@ export function clean(
     cache: Cache,
     onRemove: OnRemoveFromCache|undefined,
 ): void {
-    const {keyed, unkeyed, renderedKeys, renderedIndices} = cache;
+    const {keyed, unkeyed} = cache;
 
     if (keyed !== undefined) {
         // go through keyed children
-        for (const key in keyed) {
-            removeKeyed(cache, keyed, key, onRemove);
+        const keys = Object.keys(keyed);
+        for (let i = 0; i < keys.length; i++) {
+            // children.keyed[key] can be undefined because deleting unmounted children
+            // are defered to until that number hits a threshold.
+            // in some js engines, delete operator deoptimizes objects thus
+            // it is better to copy objects when there are enough keys to
+            // delete
+            const key = keys[i];
+            const child = keyed[key];
+            if (child === undefined
+                || cache.renderedKeys !== undefined
+                && cache.renderedKeys[key] & 1
+            ) {
+                continue;
+            }
+            delete keyed[key];
+            cache.keyedCount--;
+            if (onRemove !== undefined) {
+                onRemove(child);
+            }
         }
     }
 
@@ -175,8 +200,15 @@ export function clean(
         }
     }
 
+    reset(cache);
+}
+
+export function reset(
+    cache: Cache,
+): void {
     // reset renderedIndices, renderedKeys and unkeyedIndex
     // don't create additional garbage to collect for GC
+    const {renderedKeys, renderedIndices} = cache;
     if (renderedIndices !== undefined) {
         renderedIndices.length = 0;
     }
@@ -187,28 +219,16 @@ export function clean(
     cache.markIndex = 0;
 }
 
-function removeKeyed(
-    cache: Cache,
-    keyed: {[key: string]: IFragment},
-    key: string,
-    onRemove: OnRemoveFromCache|undefined,
-): void {
-    // children.keyed[key] can be undefined because deleting unmounted children
-    // are defered to until that number hits a threshold.
-    // in some js engines, delete operator deoptimizes objects thus
-    // it is better to copy objects when there are enough keys to
-    // delete
-    const child = keyed[key];
-    if (child === undefined
-        || cache.renderedKeys !== undefined
-        && cache.renderedKeys[key] & 1
-    ) {
-        return;
+
+export function keyedCount(cache: Cache): number {
+    return cache.keyedCount;
+}
+
+export function unkeyedCount(cache: Cache): number {
+    if (cache.unkeyed === undefined) {
+        return 0;
     }
-    delete keyed[key];
-    if (onRemove !== undefined) {
-        onRemove(child);
-    }
+    return cache.unkeyed.length;
 }
 
 function removeUnkeyed(

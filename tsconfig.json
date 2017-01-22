@@ -2,8 +2,9 @@
     "compilerOptions": {
         "target": "es6",
         "module": "es6",
+        "moduleResolution": "node",
         "noImplicitAny": true,
-        "outDir": "ts",
+        "outDir": "dist",
         "sourceMap": true,
         "strictNullChecks": true,
         "noImplicitReturns": true,
@@ -11,9 +12,6 @@
         "noUnusedLocals": true,
         "removeComments": false
     },
-    "files": [
-        "node_modules/dedent-js/lib/index.d.ts"
-    ],
     "include": [
         "src/**/*.ts"
     ],

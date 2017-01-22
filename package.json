@@ -1,8 +1,9 @@
 {
   "name": "harp",
-  "version": "0.0.1",
+  "version": "0.0.20",
   "description": "component system for incremental-dom",
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
   "repository": "https://github.com/anilanar/harp",
   "author": "Anil Anar <anilanar@hotmail.com>",
   "license": "MIT",
@@ -10,10 +11,8 @@
     "test": "jest"
   },
   "dependencies": {
-    "dedent-js": "^1.0.1",
     "incremental-dom": "^0.5.1",
-    "redux": "^3.6.0",
-    "shallowequal": "^0.2.2"
+    "redux": "^3.6.0"
   },
   "devDependencies": {
     "@types/incremental-dom": "^0.5.0",

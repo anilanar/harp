@@ -1,5 +1,5 @@
 import {
-    patchOuter,
+    patch,
 } from 'incremental-dom';
 
 export {
@@ -17,6 +17,7 @@ import {
 
 import {
     createFragment,
+    fragmentVoid,
 } from './fragment';
 
 import options from './options';
@@ -29,7 +30,14 @@ export function render(template: Template, parentDom: Element): void {
         undefined,
         undefined,
     ) as IFragment;
-    patchOuter(parentDom, function () {
-        template(rootFragment, undefined, undefined);
+    patch(parentDom, function () {
+        fragmentVoid(
+            rootFragment,
+            template,
+            undefined,
+            undefined,
+            undefined,
+        );
+        options.fragmentCacher.clean(rootFragment.cache, undefined);
     });
 }

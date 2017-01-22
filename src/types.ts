@@ -10,11 +10,11 @@ export interface IBaseFragment {
     parent: IFragment|undefined,
 };
 
-export type EmptyFragment = {
-    isEmpty: true,
+export interface IEmptyFragment {
+    isEmpty: boolean,
     onRemoved: OnRemoved|undefined,
     parent: IFragment|undefined,
-};
+}
 
 export interface IFragment extends IBaseFragment {
     bucket?: IBucket,
@@ -25,10 +25,10 @@ export interface IFragment extends IBaseFragment {
     onRemoved: OnRemoved|undefined,
     parent: IFragment|undefined,
     template: Template,
-    isEmpty: false,
+    isEmpty: boolean,
 }
 
-export type RootFragment = {
+export interface IRootFragment {
     bucket?: IBucket,
     cache: ICache,
     children: Children|undefined,
@@ -38,9 +38,9 @@ export type RootFragment = {
     parent: undefined,
     template: Template,
     isEmpty: false,
-};
+}
 
-export type Fragment = {
+export interface ISubFragment {
     bucket?: IBucket,
     cache: ICache,
     children: Children|undefined,
@@ -50,21 +50,22 @@ export type Fragment = {
     parent: IFragment,
     template: Template,
     isEmpty: false,
-};
+}
 
 export type Template = (
-    parentFragment: IFragment,
+    fragment: IFragment,
     props: IProps|undefined,
     children: Children|undefined,
-) => Element;
+) => Element|undefined;
 
 
 export interface IFragmentCacher {
-    createCache(): ICache;
+    Cache: {new(): ICache};
     getChild(cache: ICache, key: string|undefined): IBaseFragment|undefined;
     putChild(cache: ICache, child: IBaseFragment): string|undefined;
     mark(cache: ICache, key: string|undefined): void;
-    clean(cache: ICache, onRemove: OnRemoveFromCache): void;
+    clean(cache: ICache, onRemove: OnRemoveFromCache|undefined): void;
+    reset(cache: ICache): void;
 }
 
 export interface IOptions {
