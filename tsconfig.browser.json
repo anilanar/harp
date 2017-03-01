@@ -1,0 +1,12 @@
+{
+    "extends": "./tsconfig",
+    "compilerOptions": {
+        "target": "es6",
+        "module": "es6",
+        "outDir": "browser"
+    },
+    "include": [
+      "browser.ts",
+      "src/**/*.ts"
+    ]
+}

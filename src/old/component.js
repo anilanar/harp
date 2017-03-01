@@ -130,7 +130,6 @@ export class Component {
             type: RECEIVE_PROPS,
             payload: props,
         });
-
     }
 
     renderOpen(props) {

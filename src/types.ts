@@ -59,7 +59,7 @@ export type Template = (
 ) => Element|undefined;
 
 
-export interface IFragmentCacher {
+export interface ICacheSystem {
     Cache: {new(): ICache};
     getChild(cache: ICache, key: string|undefined): IBaseFragment|undefined;
     putChild(cache: ICache, child: IBaseFragment): string|undefined;
@@ -68,8 +68,90 @@ export interface IFragmentCacher {
     reset(cache: ICache): void;
 }
 
+export interface IFragmentSystem {
+    createFragment(
+        parentFragment: IFragment|undefined,
+        template: Template,
+        key: string|undefined,
+        children: Children|undefined,
+    ): IBaseFragment;
+
+    createEmptyFragment(
+        parentFragment: IFragment|undefined,
+    ): IEmptyFragment;
+
+    getBucket(fragment: IFragment): IBucket;
+
+    fragmentOpen(
+        parentFragment: IFragment|undefined,
+        template: Template,
+        key: string|undefined,
+        children: Children|undefined,
+        props: IProps|undefined,
+    ): Element|undefined;
+
+    fragmentClose(
+        parentFragment: IFragment|undefined,
+        template: Template,
+        key: string|undefined,
+        children: Children|undefined,
+        props: IProps|undefined,
+    ): Element|undefined;
+
+    fragmentVoid(
+        parentFragment: IFragment|undefined,
+        template: Template,
+        key: string|undefined,
+        children: Children|undefined,
+        props: IProps|undefined,
+    ): Element|undefined;
+
+    refresh(fragment: ISubFragment): void;
+
+    skip(fragment: IFragment): Element|undefined;
+}
+
+export interface IDOM {
+    elementOpen(
+        name: string,
+        key?: string,
+        statics?: any[],
+        ...args: any[],
+    ): Element;
+
+    elementClose(
+        name: string,
+    ): Element;
+
+    elementVoid(
+        name: string,
+        key?: string,
+        statics?: any[],
+        ...args: any[],
+    ): Element;
+
+    text(value: string|number|boolean): Text;
+
+    patchInner<T>(
+        node: Element|DocumentFragment,
+        fn: (data: T) => void,
+        data?: T
+    ): Node;
+
+    patchOuter<T>(
+        node: Element,
+        fn: (data: T) => void,
+        data?: T
+    ): Node|null;
+
+    currentPointer(): Node;
+    skipNode(): void;
+}
+
 export interface IOptions {
-    fragmentCacher: IFragmentCacher
+    cacheSystem: ICacheSystem,
+    fragmentSystem: IFragmentSystem,
+    idom: IDOM,
 }
 
 export interface ICache {

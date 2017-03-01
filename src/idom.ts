@@ -15,29 +15,27 @@ import {
     Template,
 } from './types';
 
-import {
-    createFragment,
-    fragmentVoid,
-} from './fragment';
-
 import options from './options';
+const {
+    cacheSystem: C,
+    fragmentSystem: F,
+} = options;
 
 export function render(template: Template, parentDom: Element): void {
-    const rootFragment = createFragment(
-        options,
+    const rootFragment = F.createFragment(
         undefined,
         template,
         undefined,
         undefined,
     ) as IFragment;
     patch(parentDom, function () {
-        fragmentVoid(
+        F.fragmentVoid(
             rootFragment,
             template,
             undefined,
             undefined,
             undefined,
         );
-        options.fragmentCacher.clean(rootFragment.cache, undefined);
+        C.clean(rootFragment.cache, undefined);
     });
 }
